@@ -6,3 +6,16 @@ dist/
 venv/
 .idea/
 .vscode/
+
+# Local backups and archives
+.sentinel-backups/
+*.zip
+
+# Build artifacts
+build/
+coverage/
+*.sqlite3
+*.db
+
+# Local IDE files
+.zed/
