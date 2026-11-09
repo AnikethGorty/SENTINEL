@@ -1,0 +1,25 @@
+from fastapi import FastAPI
+from app.api.scanner import router as scanner_router
+from app.api.assessment import router as assessment_router
+
+app = FastAPI(
+    title="SENTINEL",
+    description="Adaptive Security Assessment Platform",
+    version="0.1.0"
+)
+
+app.include_router(scanner_router)
+app.include_router(assessment_router)
+
+@app.get("/")
+async def root():
+    return {
+        "name": "SENTINEL",
+        "status": "operational",
+        "version": "0.1.0"
+    }
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}

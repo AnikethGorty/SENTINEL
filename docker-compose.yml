@@ -1,0 +1,77 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: sentinel-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg://sentinel:${DB_PASSWORD}@database:5432/sentinel
+      - SCANNER_URL=http://scanner:8100
+      - SCANNER_API_KEY=${SCANNER_API_KEY}
+      - SENTINEL_SIGNING_PRIVATE_KEY_B64=${SENTINEL_SIGNING_PRIVATE_KEY_B64}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - AI_AUTO_FAILOVER=${AI_AUTO_FAILOVER:-true}
+      - AI_FALLBACK_PROVIDER=${AI_FALLBACK_PROVIDER:-mistral}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+      - GEMINI_FALLBACK_MODELS=${GEMINI_FALLBACK_MODELS:-}
+      - GEMINI_ATTEMPT_TIMEOUT_SECONDS=${GEMINI_ATTEMPT_TIMEOUT_SECONDS:-60}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - MISTRAL_MODEL=${MISTRAL_MODEL:-mistral-small-latest}
+      - MISTRAL_BASE_URL=${MISTRAL_BASE_URL:-https://api.mistral.ai/v1}
+      - MISTRAL_TIMEOUT_SECONDS=${MISTRAL_TIMEOUT_SECONDS:-90}
+    depends_on:
+      database:
+        condition: service_healthy
+      scanner:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: sentinel-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - backend
+
+  scanner:
+    build:
+      context: ./scanner
+    container_name: sentinel-scanner
+    environment:
+      - SCANNER_API_KEY=${SCANNER_API_KEY}
+      - SCANNER_ALLOWED_TARGETS=${SCANNER_ALLOWED_TARGETS}
+      - SENTINEL_SIGNING_PUBLIC_KEY_B64=${SENTINEL_SIGNING_PUBLIC_KEY_B64}
+      - SCANNER_REPLAY_DB=/var/lib/sentinel/results/used_authorizations.sqlite3
+    expose:
+      - "8100"
+    volumes:
+      - scanner_results:/var/lib/sentinel/results
+    restart: unless-stopped
+
+  database:
+    image: postgres:17-alpine
+    container_name: sentinel-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: sentinel
+    volumes:
+      - sentinel_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sentinel_data:
+  scanner_results:
